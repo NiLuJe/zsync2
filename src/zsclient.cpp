@@ -72,7 +72,7 @@ namespace zsync2 {
             const std::string& refererUrl
         ) : pathOrUrlToZSyncFile(std::move(pathOrUrlToZSyncFile)), zsHandle(nullptr), state(INITIALIZED),
                                  localUsed(0), httpDown(0), remoteFileSizeCache(-1),
-                                 zSyncFileStoredLocallyAlready(false), rangesOptimizationThreshold(0) {
+                                 zSyncFileStoredLocallyAlready(false), rangesOptimizationThreshold(64 * 4096) {
             // if the local file should be overwritten, we'll instruct
             if (overwrite) {
                 this->pathToLocalFile = pathToLocalFile;
