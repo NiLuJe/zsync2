@@ -11,7 +11,7 @@ namespace zsync2 {
         Private *d;
 
     public:
-        explicit ZSyncClient(std::string urlOrPathToZsyncFile, std::string pathToLocalFile = "", bool overwrite = true);
+        explicit ZSyncClient(std::string urlOrPathToZsyncFile, std::string pathToLocalFile = "", bool overwrite = true, std::string refererUrl = "");
         ~ZSyncClient();
 
     public:

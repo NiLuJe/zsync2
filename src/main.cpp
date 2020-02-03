@@ -43,8 +43,13 @@ int main(const int argc, const char** argv) {
     );
 
     args::ValueFlag<string> outputFilename(parser, "path",
-        "Path to local file which should be created. If not given, file path in .zsync file will be used.",
+        "Path to local file which should be created or overwritten. If not given, file path in .zsync file will be used.",
         {'o', "output"}
+    );
+
+    args::ValueFlag<string> refererUrl(parser, "URL",
+        "Referer URL. If not given, URL in .zsync file will be used.",
+        {'u', "url"}
     );
 
     args::Flag forceUpdate(parser, "", "Skip update check and force update", {"force-update"});
@@ -106,10 +111,16 @@ int main(const int argc, const char** argv) {
 
     string outPath;
 
-    if (outputFilename)
+    if (outputFilename) {
         outPath = outputFilename.Get();
+    }
 
-    zsync2::ZSyncClient client(pathOrUrl.Get(), outPath);
+    string refUrl;
+
+    if (refererUrl)
+        refUrl = refererUrl.Get();
+
+    zsync2::ZSyncClient client(pathOrUrl.Get(), outPath, true, refUrl);
 
     // unimplemented flags
     if (httpInsecureMode)
