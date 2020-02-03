@@ -972,7 +972,8 @@ namespace zsync2 {
 
             // check whether file exists at all, because if not, a full download is required
             if (!isfile(pathToLocalFile)) {
-                issueStatusMessage("Cannot find file " + pathToLocalFile + ", triggering full download");
+                // Not actually a full download if we have seed file(s) ;).
+                issueStatusMessage("Cannot find file " + pathToLocalFile + ", triggering " + (seedFiles.size() == 0U ? "full" : "delta") + " download");
                 updateAvailable = true;
                 return true;
             }

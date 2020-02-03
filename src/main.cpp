@@ -129,6 +129,12 @@ int main(const int argc, const char** argv) {
     if (saveZSyncFilePath)
         client.storeZSyncFileInPath(saveZSyncFilePath.Get());
 
+    if (seedFiles) {
+        for (const auto& seedFile : seedFiles.Get()) {
+            client.addSeedFile(seedFile);
+        }
+    }
+
     if (checkForChanges || !forceUpdate) {
         cout << "Checking for changes..." << endl;
 
@@ -148,12 +154,6 @@ int main(const int argc, const char** argv) {
         } else {
             cout << "No changes detected, file is up to date." << endl;
             return 0;
-        }
-    }
-
-    if (seedFiles) {
-        for (const auto& seedFile : seedFiles.Get()) {
-            client.addSeedFile(seedFile);
         }
     }
 
