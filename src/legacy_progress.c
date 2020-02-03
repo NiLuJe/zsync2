@@ -61,7 +61,7 @@ void do_progress(struct progress *p, float pcnt, long long newdl) {
             if (sleft < 60 * 1000)
                 printf("%d:%02d ETA  ", sleft / 60, sleft % 60);
             else
-                puts("        ");
+                puts("                        ");
         }
         p->lastdl = newdl;
         p->lastpcnt = pcnt;
@@ -83,6 +83,6 @@ void end_progress(struct progress *p, int done) {
         float rate = ((float)p->lastdl) / (p->lasttime - p->starttime + 0.5);
         printf(" %.1f kBps ", rate / 1000.0);
     }
-    puts(done == 2 ? "DONE    \n" : !done ? "aborted    \n" : "        \n");
+    puts(done == 2 ? "DONE     \n" : !done ? "aborted    \n" : "           \n");
     fflush(stdout);
 }
