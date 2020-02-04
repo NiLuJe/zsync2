@@ -73,6 +73,8 @@ if(UNIX)
         add_definitions("-DAPPIMAGEUPDATE_BSD")
     elseif("${LOWER_SYSTEM}" MATCHES "linux")
         add_definitions("-DAPPIMAGEUPDATE_LINUX")
+        # For a whole lotta stuff on Linux...
+        add_definitions("-D_XOPEN_SOURCE=700")
     else()
         message(FATAL_ERROR "Unsupported UNIX platform: ${CMAKE_SYSTEM_NAME}")
     endif()
