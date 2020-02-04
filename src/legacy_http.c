@@ -198,7 +198,7 @@ void http_load_ranges(struct range_fetch* rf)
         l = strlen(ranges_opt);
         snprintf(range, sizeof(range), OFF_T_PF "-" OFF_T_PF ",",
                  (intmax_t) rf->ranges_todo[2 * i], (intmax_t) rf->ranges_todo[2 * i + 1]);
-        strncat(ranges_opt, range, l + strlen(range));
+        strncat(ranges_opt, range, sizeof(ranges_opt) - l - 1);
         rf->rangessent++;
     }
 
