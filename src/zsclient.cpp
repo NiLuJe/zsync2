@@ -81,7 +81,7 @@ namespace zsync2 {
             }
 
             // if we specified a referer URL, use it
-            if (!refererUrl.empty()) {
+            if (!refererUrl.empty() && refererUrl.back() == '/') {
                 this->referer = refererUrl;
             }
 
