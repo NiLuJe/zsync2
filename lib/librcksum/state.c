@@ -5,8 +5,8 @@
  *   Copyright (C) 2004,2005,2007,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying 
- *   file COPYING for the full license terms), or, at your option, any later 
+ *   it under the terms of the Artistic License v2 (see the accompanying
+ *   file COPYING for the full license terms), or, at your option, any later
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -56,7 +56,7 @@ struct rcksum_state *rcksum_init(zs_blockid nblocks, size_t blocksize,
 
     /* Temporary file to hold the target file as we get blocks for it */
     static const char template[] = "rcksum-XXXXXX";
-    if (directory != NULL) {strdup("rcksum-XXXXXX");
+    if (directory != NULL) {
         rs->filename = (char*) calloc(strlen(directory) + strlen(template) + 2, sizeof(char));
         strcat(rs->filename, directory);
         strcat(rs->filename, "/");
