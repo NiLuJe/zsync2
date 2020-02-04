@@ -688,8 +688,8 @@ namespace zsync2 {
                 #ifdef ZSYNC_STANDALONE
                 /* Set up progress display to run during the fetch */
                 struct progress p = { 0, 0, 0, 0 };
-
                 fputc('\n', stderr);
+                do_progress(&p, 0, 0);
                 #endif
                 int len;
                 for (const auto& pair : ranges) {
@@ -703,10 +703,6 @@ namespace zsync2 {
 
                     {
                         off_t zoffset;
-
-                        #ifdef ZSYNC_STANDALONE
-                        do_progress(&p, (float) calculateProgress() * 100.0f, range_fetch_bytes_down(rf));
-                        #endif
 
                         /* Loop while we're receiving data, until we're done or there is an error */
                         while (!ret
