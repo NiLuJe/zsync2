@@ -484,7 +484,7 @@ namespace zsync2 {
 
             std::stringstream oss;
             oss << "optimized ranges, old requests count " << ranges.size()
-                << ", new requests count " << optimizedRanges.size() << std::endl;
+                << ", new requests count " << optimizedRanges.size();
 
             issueStatusMessage(oss.str());
 
@@ -685,6 +685,13 @@ namespace zsync2 {
 
             // begin downloading ranges, one by one
             {
+                #ifdef ZSYNC_STANDALONE
+                /* Set up progress display to run during the fetch */
+                struct progress p = { 0, 0, 0, 0 };
+
+                fputc('\n', stderr);
+                #endif
+                int len;
                 for (const auto& pair : ranges) {
                     auto beginbyte = pair.first;
                     auto endbyte = pair.second;
@@ -695,14 +702,9 @@ namespace zsync2 {
                     range_fetch_addranges(rf, single_range, 1);
 
                     {
-                        int len;
                         off_t zoffset;
 
                         #ifdef ZSYNC_STANDALONE
-                        struct progress p = { 0, 0, 0, 0 };
-
-                        /* Set up progress display to run during the fetch */
-                        fputc('\n', stderr);
                         do_progress(&p, (float) calculateProgress() * 100.0f, range_fetch_bytes_down(rf));
                         #endif
 
@@ -733,13 +735,12 @@ namespace zsync2 {
                          *could be data in its buffer that it can use or needs to process */
                             zsync_receive_data(zr, nullptr, zoffset, 0);
                         }
-
-                        #ifdef ZSYNC_STANDALONE
-                        end_progress(&p, zsync_status(zsHandle) >= 2 ? 2 : len == 0 ? 1 : 0);
-                        #endif
                     }
 
                 }
+                #ifdef ZSYNC_STANDALONE
+                end_progress(&p, zsync_status(zsHandle) >= 2 ? 2 : len == 0 ? 1 : 0);
+                #endif
             }
 
             /* Clean up */
