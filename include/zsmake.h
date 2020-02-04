@@ -34,7 +34,7 @@ namespace zsync2 {
         void setUrl(const std::string& url);
 
         // will be called for every log message issued by the code
-        bool setLogMessageCallback(std::function<void(std::string)> callback);
+        void setLogMessageCallback(std::function<void(std::string)> callback);
 
         // add custom header field
         // returns true when there is no header with such a key yet, otherwise overwrites the existing value and
