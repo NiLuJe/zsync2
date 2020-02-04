@@ -58,7 +58,7 @@ int zsync_submit_source_file(struct zsync_state* zs, FILE* f, int progress);
  * (the URL pointers are still referenced by the library, and are valid only until zsync_end).
  */
 
-char ** zsync_get_urls(struct zsync_state* zs, int* n, int* t);
+const char * const * zsync_get_urls(struct zsync_state* zs, int* n, int* t);
 
 /* zsync_needed_byte_ranges - get the byte ranges needed from a URL.
  * Returns the number of ranges in *num, and a malloc'd array (to be freed

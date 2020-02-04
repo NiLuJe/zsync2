@@ -453,16 +453,16 @@ void zsync_progress(const struct zsync_state *zs, long long *got,
  * Note that these URLs could be for encoded versions of the target; a 'type'
  * is returned in *type which tells libzsync in later calls what version of the
  * target is being retrieved. */
-char **zsync_get_urls(struct zsync_state *zs, int *n, int *t) {
+const char * const *zsync_get_urls(struct zsync_state *zs, int *n, int *t) {
     if (zs->zmap && zs->nzurl) {
         *n = zs->nzurl;
         *t = 1;
-        return zs->zurl;
+        return (const char * const *) zs->zurl;
     }
     else {
         *n = zs->nurl;
         *t = 0;
-        return zs->url;
+        return (const char * const *) zs->url;
     }
 }
 
