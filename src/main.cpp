@@ -123,8 +123,13 @@ int main(const int argc, const char** argv) {
 
     string refUrl;
 
-    if (refererUrl)
+    if (refererUrl) {
         refUrl = refererUrl.Get();
+        if (!refUrl.empty() && refUrl.back() != '/') {
+            cerr << "Referer URL must actually be an URL (i.e., end with a /)!" << endl;
+            return 1;
+        }
+    }
 
     zsync2::ZSyncClient client(pathOrUrl.Get(), outPath, true, refUrl);
 
