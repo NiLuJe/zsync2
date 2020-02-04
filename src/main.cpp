@@ -105,8 +105,14 @@ int main(const int argc, const char** argv) {
 
     // redirect cout/cerr to /dev/null in quiet mode
     if (quietMode) {
-        freopen("/dev/null", "a", stdout);
-        freopen("/dev/null", "a", stderr);
+        if (!freopen("/dev/null", "a", stdout)) {
+            cerr << "Failed to redirect stdout to /dev/null!" << endl;
+            return 1;
+        }
+        if (!freopen("/dev/null", "a", stderr)) {
+            cerr << "Failed to redirect stderr to /dev/null!" << endl;
+            return 1;
+        }
     }
 
     string outPath;
