@@ -788,10 +788,10 @@ char *zsync_end(struct zsync_state *zs) {
  */
 void zsync_configure_zstream_for_zdata(const struct zsync_state *zs,
                                        struct z_stream_s *zstrm,
-                                       long zoffset, long long *poutoffset) {
+                                       long zoffset, off_t *poutoffset) {
     configure_zstream_for_zdata(zs->zmap, zstrm, zoffset, poutoffset);
     {                           /* Load in prev 32k sliding window for backreferences */
-        long long pos = *poutoffset;
+        off_t pos = *poutoffset;
         int lookback = (pos > 32768) ? 32768 : pos;
 
         /* Read in 32k of leading uncompressed context - needed because the deflate
