@@ -687,9 +687,11 @@ namespace zsync2 {
             {
                 #ifdef ZSYNC_STANDALONE
                 /* Set up progress display to run during the fetch */
-                struct progress p = { 0, 0, 0, 0 };
+                struct progress *p;
                 fputc('\n', stderr);
-                do_progress(&p, 0, 0);
+                p = start_progress();
+                do_progress(p, (float) calculateProgress() * 100.0f,
+                                        range_fetch_bytes_down(rf));
                 #endif
                 int len;
                 for (const auto& pair : ranges) {
@@ -714,7 +716,7 @@ namespace zsync2 {
 
                             #ifdef ZSYNC_STANDALONE
                             /* Maintain progress display */
-                            do_progress(&p, (float) calculateProgress() * 100.0f,
+                            do_progress(p, (float) calculateProgress() * 100.0f,
                                         range_fetch_bytes_down(rf));
                             #endif
 
@@ -735,7 +737,7 @@ namespace zsync2 {
 
                 }
                 #ifdef ZSYNC_STANDALONE
-                end_progress(&p, zsync_status(zsHandle) >= 2 ? 2 : len == 0 ? 1 : 0);
+                end_progress(p, zsync_status(zsHandle) >= 2 ? 2 : len == 0 ? 1 : 0);
                 #endif
             }
 
