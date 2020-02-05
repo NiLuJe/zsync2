@@ -37,7 +37,7 @@
 #endif
 
 #include "zmap.h"
-#include "format_string.h"
+#include "../../src/format_string.h"
 
 /* This is a record of a checkpoint in a zlib stream - we have the bit position
  * (yes, bit - zlib compresses input bytes down to a variable number of bits)
@@ -273,7 +273,7 @@ off_t *zmap_to_compressed_ranges(const struct zmap *zm, off_t * byterange,
         /* (try to) Find byte ranges in the compressed file to get this the ith
          * byterange. */
         k = find_compressed_ranges_for(zm, zbyterange, k, &lastwroteblockstart_inbitoffset,
-                                       byterange[2 * i], byterange[2 * i + 1]);
+                                       (intmax_t) byterange[2 * i], (intmax_t) byterange[2 * i + 1]);
         if (k < 0) {
             fprintf(stderr, "Z-Map couldn't tell us how to find " OFF_T_PF "-" OFF_T_PF "\n", byterange[2 * i], byterange[2 * i + 1]);
             free(zbyterange);
@@ -320,7 +320,7 @@ int zmap_search(const struct zmap* zm, long zoffset) {
  * Given an zoffset and a zmap, configure the supplied zstream to be in the
  * correct state to interpret the compressed data stream read from the
  * compressed file at this offset. And return the offset in the uncompressed
- * stream that this corresponds to in the supplied long long* .
+ * stream that this corresponds to in the supplied off_t* .
  * NOTE: the caller must call zlib:updatewindow() on the zstream to supply it
  * with 32k of leading context in the uncompressed stream, before the zstream
  * can be used to actually decompress.
@@ -333,7 +333,7 @@ int zmap_search(const struct zmap* zm, long zoffset) {
  * and in the order that it returned them, this condition is satisfied.
  */
 void configure_zstream_for_zdata(const struct zmap *zm, z_stream * zs,
-                                 long zoffset, long long *poutoffset) {
+                                 long zoffset, off_t *poutoffset) {
     /* Find the zmap entry corresponding to this offset */
     int i = zmap_search(zm, zoffset);
 

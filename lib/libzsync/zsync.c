@@ -113,7 +113,14 @@ struct zsync_state {
     char *gzhead;               /* And this is the header of the gzip file (for the mtime) */
 
     time_t mtime;               /* MTime: from the .zsync, or -1 */
+
+    /* directory to create */
+    char *target_dir;
 };
+
+off_t zsync_filelen(struct zsync_state *zs) {
+    return zs->filelen;
+}
 
 static int zsync_read_blocksums(struct zsync_state *zs, FILE * f,
                                 int rsum_bytes, int checksum_bytes,
@@ -139,7 +146,7 @@ static char **append_ptrlist(int *n, char **p, char *a) {
 }
 
 /* Constructor */
-struct zsync_state *zsync_begin(FILE * f) {
+struct zsync_state *zsync_begin(FILE * f, int headersOnly, const char* target_dir) {
     /* Defaults for the checksum bytes and sequential matches properties of the
      * rcksum_state. These are the defaults from versions of zsync before these
      * were variable. */
@@ -310,12 +317,21 @@ struct zsync_state *zsync_begin(FILE * f) {
         free(zs);
         return NULL;
     }
-    if (zsync_read_blocksums(zs, f, rsum_bytes, checksum_bytes, seq_matches) != 0) {
+
+    if (target_dir != NULL)
+        zs->target_dir = strdup(target_dir);
+    else
+        zs->target_dir = NULL;
+
+    if (headersOnly == 0 && zsync_read_blocksums(zs, f, rsum_bytes, checksum_bytes, seq_matches) != 0) {
         free(zs);
         return NULL;
     }
     return zs;
 }
+
+// forward declare zsync_cur_filename
+static char *zsync_cur_filename(struct zsync_state *zs);
 
 /* zsync_read_blocksums(self, FILE*, rsum_bytes, checksum_bytes, seq_matches)
  * Called during construction only, this creates the rcksum_state that stores
@@ -330,7 +346,7 @@ static int zsync_read_blocksums(struct zsync_state *zs, FILE * f,
                                 int seq_matches) {
     /* Make the rcksum_state first */
     if (!(zs->rs = rcksum_init(zs->blocks, zs->blocksize, rsum_bytes,
-                               checksum_bytes, seq_matches))) {
+                               checksum_bytes, seq_matches, zs->target_dir))) {
         return -1;
     }
 
@@ -422,6 +438,8 @@ int zsync_status(const struct zsync_state *zs) {
  */
 void zsync_progress(const struct zsync_state *zs, long long *got,
                     long long *total) {
+    if (!zs->rs)
+        return;
 
     if (got) {
         int todo = zs->blocks - rcksum_blocks_todo(zs->rs);
@@ -442,12 +460,12 @@ const char *const *zsync_get_urls(struct zsync_state *zs, int *n, int *t) {
     if (zs->zmap && zs->nzurl) {
         *n = zs->nzurl;
         *t = 1;
-        return zs->zurl;
+        return (const char * const *) zs->zurl;
     }
     else {
         *n = zs->nurl;
         *t = 0;
-        return zs->url;
+        return (const char * const *) zs->url;
     }
 }
 
@@ -756,7 +774,10 @@ char *zsync_end(struct zsync_state *zs) {
     free(zs->checksum);
     free(zs->filename);
     free(zs->zfilename);
+    if (zs->target_dir != NULL)
+        free(zs->target_dir);
     free(zs);
+    zs = NULL;
     return f;
 }
 
@@ -926,7 +947,7 @@ static int zsync_receive_data_compressed(struct zsync_receiver *zr,
         return 0;
 
     /* Now set up for the downloaded block */
-    zr->strm.next_in = buf;
+    zr->strm.next_in = (unsigned char *) buf;
     zr->strm.avail_in = len;
 
     if (zr->strm.total_in == 0 || offset != zr->strm.total_in) {
@@ -943,7 +964,7 @@ static int zsync_receive_data_compressed(struct zsync_receiver *zr,
                     "data didn't align with block boundary in compressed stream\n");
             return 1;
         }
-        zr->strm.next_in = buf;
+        zr->strm.next_in = (unsigned char *) buf;
         zr->strm.avail_in = len;
     }
 
