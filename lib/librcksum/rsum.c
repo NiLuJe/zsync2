@@ -37,7 +37,7 @@
 #include "internal.h"
 /* TODO: decide how to handle progress; this is now being used by the client
  * and by the library, which is ugly. */
-#include "../progress.h"
+#include "../../src/legacy_progress.h"
 
 #define UPDATE_RSUM(a, b, oldc, newc, bshift) do { (a) += ((unsigned char)(newc)) - ((unsigned char)(oldc)); (b) += (a) - ((oldc) << (bshift)); } while (0)
 
