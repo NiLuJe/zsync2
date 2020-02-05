@@ -512,7 +512,11 @@ namespace zsync2 {
                 }
             }
 
+            #ifdef ZSYNC_STANDALONE
+            zsync_submit_source_file(zsHandle, f, true);
+            #else
             zsync_submit_source_file(zsHandle, f, false);
+            #endif
 
             if (fclose(f) != 0) {
                 issueStatusMessage("fclose() on file handle failed!");
