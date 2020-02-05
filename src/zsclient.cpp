@@ -731,7 +731,8 @@ namespace zsync2 {
                         }
                         else{    /* Else, let the zsync receiver know that we're at EOF; there
                          *could be data in its buffer that it can use or needs to process */
-                            zsync_receive_data(zr, nullptr, zoffset, 0);
+                            if (zsync_receive_data(zr, nullptr, zoffset, 0) != 0)
+                                ret = 1;
                         }
                     }
 
