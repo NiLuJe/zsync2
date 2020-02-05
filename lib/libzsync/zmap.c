@@ -4,8 +4,8 @@
  *   Copyright (C) 2004,2005,2007,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying 
- *   file COPYING for the full license terms), or, at your option, any later 
+ *   it under the terms of the Artistic License v2 (see the accompanying
+ *   file COPYING for the full license terms), or, at your option, any later
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -281,7 +281,7 @@ off_t *zmap_to_compressed_ranges(const struct zmap *zm, off_t * byterange,
         }
     }
 
-    /* Return the # of ranges and the array of byte ranges we have built 
+    /* Return the # of ranges and the array of byte ranges we have built
      * after consolidating ranges where possible */
     *num = k;
     return consolidate_byteranges(zbyterange, num);

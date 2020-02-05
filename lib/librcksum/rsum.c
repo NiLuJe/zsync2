@@ -5,8 +5,8 @@
  *   Copyright (C) 2004,2005,2007,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying 
- *   file COPYING for the full license terms), or, at your option, any later 
+ *   it under the terms of the Artistic License v2 (see the accompanying
+ *   file COPYING for the full license terms), or, at your option, any later
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -293,12 +293,12 @@ static int check_checksums_on_hash_chain(struct rcksum_state *const z,
  * offset in the whole source stream otherwise.
  *
  * Returns the number of blocks in the target file that we obtained as a result
- * of reading this buffer. 
+ * of reading this buffer.
  *
  * IMPLEMENTATION:
  * We maintain the following state:
  * skip - the number of bytes to skip next time we enter rcksum_submit_source_data
- *        e.g. because we've just matched a block and the forward jump takes 
+ *        e.g. because we've just matched a block and the forward jump takes
  *        us past the end of the buffer
  * r[0] - rolling checksum of the first blocksize bytes of the buffer
  * r[1] - rolling checksum of the next blocksize bytes of the buffer (if seq_matches > 1)
@@ -339,7 +339,7 @@ int rcksum_submit_source_data(struct rcksum_state *const z, unsigned char *data,
         /* # of blocks to advance if thismatch > 0. Can be less than
          * thismatch as thismatch could be N*blocks_matched, if a block was
          * duplicated to multiple locations in the output file. */
-        int blocks_matched = 0; 
+        int blocks_matched = 0;
 
         /* Pull some invariants into locals, because the compiler doesn't
          * know they are invariants. */

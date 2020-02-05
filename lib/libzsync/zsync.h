@@ -3,8 +3,8 @@
  *   Copyright (C) 2004,2005,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying 
- *   file COPYING for the full license terms), or, at your option, any later 
+ *   it under the terms of the Artistic License v2 (see the accompanying
+ *   file COPYING for the full license terms), or, at your option, any later
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -19,7 +19,7 @@ struct zsync_state;
  */
 struct zsync_state* zsync_begin(FILE* cf);
 
-/* zsync_hint_decompress - if it returns non-zero, this suggests that 
+/* zsync_hint_decompress - if it returns non-zero, this suggests that
  *  compressed seed files should be decompressed */
 int zsync_hint_decompress(const struct zsync_state*);
 
@@ -29,8 +29,8 @@ char* zsync_filename(const struct zsync_state*);
 time_t zsync_mtime(const struct zsync_state*);
 
 /* zsync_rename_file - renames the temporary file used by zsync to the given name.
- * You don't "own" the filename until you zsync_end, but you can use this to give zsync a more 
- * appropriate intermediate filename (in case the user ctrl-c's). 
+ * You don't "own" the filename until you zsync_end, but you can use this to give zsync a more
+ * appropriate intermediate filename (in case the user ctrl-c's).
  * This is purely a hint; zsync could ignore it. Returns 0 if successful. */
 int zsync_rename_file(struct zsync_state* zs, const char* f);
 
@@ -61,8 +61,8 @@ int zsync_submit_source_file(struct zsync_state* zs, FILE* f, int progress);
 const char * const * zsync_get_urls(struct zsync_state* zs, int* n, int* t);
 
 /* zsync_needed_byte_ranges - get the byte ranges needed from a URL.
- * Returns the number of ranges in *num, and a malloc'd array (to be freed 
- * by the caller) of 2*(*num) off_t's which are the starts and ends 
+ * Returns the number of ranges in *num, and a malloc'd array (to be freed
+ * by the caller) of 2*(*num) off_t's which are the starts and ends
  * of byte ranges.
  */
 
@@ -80,9 +80,9 @@ char* zsync_end(struct zsync_state* zs);
 struct zsync_receiver;
 
 /* Begin and end receiving from a particular URL.
- * Note that the zsync_receiver stores a reference to the zsync_state, 
- *  and libzsync does not do reference counting, so it is the caller's 
- *  responsibility not to do a zsync_end without doing a zsync_end_receive 
+ * Note that the zsync_receiver stores a reference to the zsync_state,
+ *  and libzsync does not do reference counting, so it is the caller's
+ *  responsibility not to do a zsync_end without doing a zsync_end_receive
  *  first.
  * The url_type is as in the value returned by zsync_get_url.
  */
