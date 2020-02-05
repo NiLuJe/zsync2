@@ -5,8 +5,8 @@
  *   Copyright (C) 2004,2005,2007,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying
- *   file COPYING for the full license terms), or, at your option, any later
+ *   it under the terms of the Artistic License v2 (see the accompanying 
+ *   file COPYING for the full license terms), or, at your option, any later 
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -36,75 +36,67 @@
  * Creates and returns an rcksum_state with the given properties
  */
 struct rcksum_state *rcksum_init(zs_blockid nblocks, size_t blocksize,
-                                 int rsum_bytes, int checksum_bytes,
-                                 int require_consecutive_matches,
-                                 char* directory) {
+                                 int rsum_bytes, unsigned int checksum_bytes,
+                                 int require_consecutive_matches) {
     /* Allocate memory for the object */
-    struct rcksum_state *rs = malloc(sizeof(struct rcksum_state));
-    if (rs == NULL) return NULL;
+    struct rcksum_state *z = malloc(sizeof(struct rcksum_state));
+    if (z == NULL) return NULL;
 
     /* Enter supplied properties. */
-    rs->blocksize = blocksize;
-    rs->blocks = nblocks;
-    rs->rsum_a_mask = rsum_bytes < 3 ? 0 : rsum_bytes == 3 ? 0xff : 0xffff;
-    rs->checksum_bytes = checksum_bytes;
-    rs->seq_matches = require_consecutive_matches;
+    z->blocksize = blocksize;
+    z->blocks = nblocks;
+    z->rsum_a_mask = rsum_bytes < 3 ? 0 : rsum_bytes == 3 ? 0xff : 0xffff;
+    z->rsum_bits = rsum_bytes * 8;
+    z->checksum_bytes = checksum_bytes;
+    z->seq_matches = require_consecutive_matches;
 
     /* require_consecutive_matches is 1 if true; and if true we need 1 block of
      * context to do block matching */
-    rs->context = blocksize * require_consecutive_matches;
+    z->context = blocksize * require_consecutive_matches;
 
     /* Temporary file to hold the target file as we get blocks for it */
-    static const char template[] = "rcksum-XXXXXX";
-    if (directory != NULL) {
-        rs->filename = (char*) calloc(strlen(directory) + strlen(template) + 2, sizeof(char));
-        strcat(rs->filename, directory);
-        strcat(rs->filename, "/");
-        strcat(rs->filename, template);
-    } else {
-        rs->filename = strdup(template);
-    }
+    z->filename = strdup("rcksum-XXXXXX");
 
     /* Initialise to 0 various state & stats */
-    rs->gotblocks = 0;
-    memset(&(rs->stats), 0, sizeof(rs->stats));
-    rs->ranges = NULL;
-    rs->numranges = 0;
+    z->gotblocks = 0;
+    memset(&(z->stats), 0, sizeof(z->stats));
+    z->ranges = NULL;
+    z->numranges = 0;
 
     /* Hashes for looking up checksums are generated when needed.
      * So initially store NULL so we know there's nothing there yet.
      */
-    rs->rsum_hash = NULL;
-    rs->bithash = NULL;
+    z->rsum_hash = NULL;
+    z->bithash = NULL;
 
-    if (!(rs->blocksize & (rs->blocksize - 1)) && rs->filename != NULL
-            && rs->blocks) {
+    if (!(z->blocksize & (z->blocksize - 1)) && z->filename != NULL
+            && z->blocks) {
         /* Create temporary file */
-        rs->fd = mkstemp(rs->filename);
-        if (rs->fd == -1) {
+        z->fd = mkstemp(z->filename);
+        if (z->fd == -1) {
             perror("open");
         }
         else {
             {   /* Calculate bit-shift for blocksize */
                 int i;
                 for (i = 0; i < 32; i++)
-                    if (rs->blocksize == (1u << i)) {
-                        rs->blockshift = i;
+                    if (z->blocksize == (1u << i)) {
+                        z->blockshift = i;
                         break;
                     }
             }
 
-            rs->blockhashes =
-                malloc(sizeof(rs->blockhashes[0]) *
-                        (rs->blocks + rs->seq_matches));
-            if (rs->blockhashes != NULL)
-                return rs;
+            z->blockhashes =
+                malloc(sizeof(z->blockhashes[0]) *
+                        (z->blocks + z->seq_matches));
+            if (z->blockhashes != NULL)
+                return z;
 
             /* All below is error handling */
         }
     }
-    free(rs->filename);
-    free(rs);
+    free(z->filename);
+    free(z);
     return NULL;
 }
 
@@ -144,7 +136,7 @@ void rcksum_end(struct rcksum_state *z) {
     free(z->bithash);
     free(z->ranges);            // Should be NULL already
 #ifdef DEBUG
-    fprintf(stderr, "hashhit %d, weakhit %d, checksummed %d, stronghit %d\n",
+    fprintf(stderr, "hashhit %lld, weakhit %d, checksummed %d, stronghit %d\n",
             z->stats.hashhit, z->stats.weakhit, z->stats.checksummed,
             z->stats.stronghit);
 #endif

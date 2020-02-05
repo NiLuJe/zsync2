@@ -25,6 +25,8 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #ifdef WITH_DMALLOC
 # include <dmalloc.h>
@@ -33,20 +35,26 @@
 #include "md4.h"
 #include "rcksum.h"
 #include "internal.h"
+/* TODO: decide how to handle progress; this is now being used by the client
+ * and by the library, which is ugly. */
+#include "../progress.h"
 
 #define UPDATE_RSUM(a, b, oldc, newc, bshift) do { (a) += ((unsigned char)(newc)) - ((unsigned char)(oldc)); (b) += (a) - ((oldc) << (bshift)); } while (0)
 
 /* rcksum_calc_rsum_block(data, data_len)
  * Calculate the rsum for a single block of data. */
-struct rsum __attribute__ ((pure)) rcksum_calc_rsum_block(const unsigned char *data, size_t len) {
+/* Note int len here, not size_t, because the compiler is stupid and expands
+ * the 32bit size_t to 64bit inside the inner loop. */
+struct rsum __attribute__((pure))
+rcksum_calc_rsum_block(const unsigned char *data, size_t len) {
     register unsigned short a = 0;
     register unsigned short b = 0;
+    size_t i;
 
-    while (len) {
-        unsigned char c = *data++;
+    for (i = 0; i < len; i++) {
+        unsigned char c = data[i];
         a += c;
-        b += len * c;
-        len--;
+        b += a;
     }
     {
         struct rsum r = { a, b };
@@ -83,8 +91,8 @@ static void write_blocks(struct rcksum_state *z, const unsigned char *data,
     off_t offset = ((off_t) bfrom) << z->blockshift;
 
     while (len) {
-        size_t l = len;
-        int rc;
+        size_t l = (size_t)len;
+        ssize_t rc;
 
         /* On some platforms, the bytes-to-write could be more than pwrite(2)
          * will accept. Write in blocks of 2^31 bytes in that case. */
@@ -122,9 +130,9 @@ static void write_blocks(struct rcksum_state *z, const unsigned char *data,
 /* rcksum_read_known_data(self, buf, offset, len)
  * Read back data from the working output - read len bytes from offset into
  * buf[] (which must be at least len bytes long) */
-int rcksum_read_known_data(struct rcksum_state *z, unsigned char *buf,
-                           off_t offset, size_t len) {
-    int rc = pread(z->fd, buf, len, offset);
+ssize_t rcksum_read_known_data(struct rcksum_state *z, unsigned char *buf,
+                               off_t offset, size_t len) {
+    ssize_t rc = pread(z->fd, buf, len, offset);
     return rc;
 }
 
@@ -209,16 +217,16 @@ static int check_checksums_on_hash_chain(struct rcksum_state *const z,
         id = get_HE_blockid(z, e);
 
         if (!onlyone && z->seq_matches > 1
-            && (z->blockhashes[id + 1].r.a != (z->r[1].a & z->rsum_a_mask)
-                || z->blockhashes[id + 1].r.b != z->r[1].b))
+            && (e[1].r.a != (z->r[1].a & z->rsum_a_mask)
+                || e[1].r.b != z->r[1].b)) {
             continue;
+        }
 
         z->stats.weakhit++;
 
         {
             int ok = 1;
             signed int check_md4 = 0;
-            zs_blockid next_known = -1;
 
             /* This block at least must match; we must match at least
              * z->seq_matches-1 others, which could either be trailing stuff,
@@ -236,11 +244,9 @@ static int check_checksums_on_hash_chain(struct rcksum_state *const z,
 
                 /* Now check the strong checksum for this block */
                 if (memcmp(&md4sum[check_md4],
-                     z->blockhashes[id + check_md4].checksum,
+                     e[check_md4].checksum,
                      z->checksum_bytes))
                     ok = 0;
-
-                else if (next_known == -1)
 
                 check_md4++;
             } while (ok && !onlyone && check_md4 < z->seq_matches);
@@ -299,12 +305,13 @@ static int check_checksums_on_hash_chain(struct rcksum_state *const z,
  */
 int rcksum_submit_source_data(struct rcksum_state *const z, unsigned char *data,
                               size_t len, off_t offset) {
-    /* The window in data[] currently being considered is 
-     * [x, x+bs)
-     */
+    /* The window in data[] currently being considered is [x, x+bs) */
     int x = 0;
-    register int bs = z->blocksize;
-    int got_blocks = 0;
+    int got_blocks = 0;  /* Count the number of useful data blocks found. */
+
+    /* z->context doesn't vary during an invocation; help the compiler by
+     * putting it into a local variable here. */
+    register const int x_limit = len - z->context;
 
     if (offset) {
         x = z->skip;
@@ -314,54 +321,70 @@ int rcksum_submit_source_data(struct rcksum_state *const z, unsigned char *data,
     }
 
     if (x || !offset) {
-        z->r[0] = rcksum_calc_rsum_block(data + x, bs);
+        z->r[0] = rcksum_calc_rsum_block(data + x, z->blocksize);
         if (z->seq_matches > 1)
-            z->r[1] = rcksum_calc_rsum_block(data + x + bs, bs);
+            z->r[1] = rcksum_calc_rsum_block(data + x + z->blocksize, z->blocksize);
     }
     z->skip = 0;
 
-    /* Work through the block until the current blocksize bytes being
-     * considered, starting at x, is at the end of the buffer */
-    for (;;) {
-        if (x + z->context == len) {
-            return got_blocks;
-        }
+    /* Work through the block until the current z->context bytes being
+     * considered, starting at x, is at or past the end of the buffer */
 
-#if 0
-        {   /* Catch rolling checksum failure */
-            int k = 0;
-            struct rsum c = rcksum_calc_rsum_block(data + x + bs * k, bs);
-            if (c.a != z->r[k].a || c.b != z->r[k].b) {
-                fprintf(stderr, "rsum miscalc (%d) at %lld\n", k, offset + x);
-                exit(3);
+    /* The loop is split into an outer and an inner loop here. Both are looping
+     * over the data in the buffer; the inner loop is not strictly necessary but
+     * makes it clearer what is the critical code path i.e. stepping through the
+     * buffer one byte at a time. When we find a matching block, we skip forward
+     * by a whole block - the outer loop handles this case. */
+    while (x < x_limit /* which is len - z->context */) {
+        /* # of blocks to advance if thismatch > 0. Can be less than
+         * thismatch as thismatch could be N*blocks_matched, if a block was
+         * duplicated to multiple locations in the output file. */
+        int blocks_matched = 0; 
+
+        /* Pull some invariants into locals, because the compiler doesn't
+         * know they are invariants. */
+        register const int seq_matches = z->seq_matches;
+        register const size_t bs = z->blocksize;
+
+        /* If the previous block was a match, but we're looking for
+         * sequential matches, then test this block against the block in
+         * the target immediately after our previous hit. */
+        if (z->next_match && z->seq_matches > 1) {
+            int thismatch;
+            if (0 != (thismatch = check_checksums_on_hash_chain(z, z->next_match, data + x, 1))) {
+                blocks_matched = 1;
+                got_blocks += thismatch;
             }
         }
-#endif
 
-        {
+        /* If we already matched this block, we don't look it up in the hash
+         * table at all.
+         * Advance one byte at a time through the input stream, looking up the
+         * rolling checksum in the rsum hash table. */
+        while (0 == blocks_matched && x < x_limit) {
             /* # of blocks of the output file we got from this data */
             int thismatch = 0;
-            /* # of blocks to advance if thismatch > 0. Can be less than
-             * thismatch as thismatch could be N*blocks_matched, if a block was
-             * duplicated to multiple locations in the output file. */
-            int blocks_matched = 0; 
 
-            /* If the previous block was a match, but we're looking for
-             * sequential matches, then test this block against the block in
-             * the target immediately after our previous hit. */
-            if (z->next_match && z->seq_matches > 1) {
-                if (0 != (thismatch = check_checksums_on_hash_chain(z, z->next_match, data + x, 1))) {
-                    blocks_matched = 1;
+#if 0
+            {   /* Catch rolling checksum failure */
+                int k = 0;
+                struct rsum c = rcksum_calc_rsum_block(data + x + bs * k, bs);
+                if (c.a != z->r[k].a || c.b != z->r[k].b) {
+                    fprintf(stderr, "rsum miscalc (%d) at %lld\n", k, offset + x);
+                    exit(3);
                 }
             }
-            if (!thismatch) {
+#endif
+
+            {
                 const struct hash_entry *e;
 
                 /* Do a hash table lookup - first in the bithash (fast negative
                  * check) and then in the rsum hash */
                 unsigned hash = z->r[0].b;
-                hash ^= ((z->seq_matches > 1) ? z->r[1].b
-                        : z->r[0].a & z->rsum_a_mask) << BITHASHBITS;
+                hash ^= ((seq_matches > 1) ? z->r[1].b
+                        : z->r[0].a & z->rsum_a_mask) << z->hash_func_shift;
+
                 if ((z->bithash[(hash & z->bithashmask) >> 3] & (1 << (hash & 7))) != 0
                     && (e = z->rsum_hash[hash & z->hashmask]) != NULL) {
 
@@ -369,50 +392,70 @@ int rcksum_submit_source_data(struct rcksum_state *const z, unsigned char *data,
                      * check our block against all the entries. */
                     thismatch = check_checksums_on_hash_chain(z, e, data + x, 0);
                     if (thismatch)
-                        blocks_matched = z->seq_matches;
+                        blocks_matched = seq_matches;
                 }
             }
             got_blocks += thismatch;
 
-            /* If we got a hit, skip forward (if a block in the target matches
-             * at x, it's highly unlikely to get a hit at x+1 as all the
-             * target's blocks are multiples of the blocksize apart. */
-            if (blocks_matched) {
-                x += bs + (blocks_matched > 1 ? bs : 0);
+            /* (If we didn't match any data) advance the window by 1 byte -
+             * update the rolling checksum and our offset in the buffer */
+            if (!blocks_matched) {
+                unsigned char Nc = data[x + bs * 2];
+                unsigned char nc = data[x + bs];
+                unsigned char oc = data[x];
+                UPDATE_RSUM(z->r[0].a, z->r[0].b, oc, nc, z->blockshift);
+                if (seq_matches > 1)
+                    UPDATE_RSUM(z->r[1].a, z->r[1].b, nc, Nc, z->blockshift);
+                x++;
+            }
+        }
 
-                if (x + z->context > len) {
-                    /* can't calculate rsum for block after this one, because
-                     * it's not in the buffer. So leave a hint for next time so
-                     * we know we need to recalculate */
-                    z->skip = x + z->context - len;
-                    return got_blocks;
-                }
+        /* If we got a hit, skip forward (if a block in the target matches
+         * at x, it's highly unlikely to get a hit at x+1 as all the
+         * target's blocks are multiples of the blocksize apart. */
+        if (blocks_matched) {
+            x += z->blocksize + (blocks_matched > 1 ? z->blocksize : 0);
 
+            if (x > x_limit) {
+                /* can't calculate rsum for block after this one, because
+                 * it's not in the buffer. We will drop out of the loop and
+                 * return. */
+            } else {
                 /* If we are moving forward just 1 block, we already have the
                  * following block rsum. If we are skipping both, then
                  * recalculate both */
                 if (z->seq_matches > 1 && blocks_matched == 1)
                     z->r[0] = z->r[1];
                 else
-                    z->r[0] = rcksum_calc_rsum_block(data + x, bs);
+                    z->r[0] = rcksum_calc_rsum_block(data + x, z->blocksize);
                 if (z->seq_matches > 1)
-                    z->r[1] = rcksum_calc_rsum_block(data + x + bs, bs);
-                continue;
+                    z->r[1] = rcksum_calc_rsum_block(data + x + z->blocksize, z->blocksize);
             }
         }
-
-        /* Else - advance the window by 1 byte - update the rolling checksum
-         * and our offset in the buffer */
-        {
-            unsigned char Nc = data[x + bs * 2];
-            unsigned char nc = data[x + bs];
-            unsigned char oc = data[x];
-            UPDATE_RSUM(z->r[0].a, z->r[0].b, oc, nc, z->blockshift);
-            if (z->seq_matches > 1)
-                UPDATE_RSUM(z->r[1].a, z->r[1].b, nc, Nc, z->blockshift);
-        }
-        x++;
     }
+    /* If we jumped to a point in the stream not yet in the buffer (x > x_limit)
+     * then we need to save that state so that the next call knows where to
+     * resume - and also so that the next call knows that it must calculate the
+     * checksum of the first block because we do not have enough data to do so
+     * right now. */
+    z->skip = x - x_limit;
+
+    /* Keep caller informed about how much useful data we are getting. */
+    return got_blocks;
+}
+
+/* off_t get_file_size(FILE*)
+ * Returns the size of the given file, if available. 0 otherwise.
+ */
+static off_t get_file_size(FILE* f) {
+    struct stat st;
+    int fd = fileno(f);
+    if (fd == -1) return 0;
+    if (fstat(fd, &st) == -1) {
+        perror("fstat");
+        return 0;
+    }
+    return st.st_size;
 }
 
 /* rcksum_submit_source_file(self, stream, progress)
@@ -425,9 +468,11 @@ int rcksum_submit_source_file(struct rcksum_state *z, FILE * f, int progress) {
     int got_blocks = 0;
     off_t in = 0;
     int in_mb = 0;
+    off_t size = get_file_size(f);
+    struct progress *p;
 
     /* Allocate buffer of 16 blocks */
-    register int bufsize = z->blocksize * 16;
+    register size_t bufsize = z->blocksize * 16;
     unsigned char *buf = malloc(bufsize + z->context);
     if (!buf)
         return 0;
@@ -438,6 +483,11 @@ int rcksum_submit_source_file(struct rcksum_state *z, FILE * f, int progress) {
             free(buf);
             return 0;
         }
+
+    if (progress) {
+        p = start_progress();
+        do_progress(p, 0, in);
+    }
 
     while (!feof(f)) {
         size_t len;
@@ -461,6 +511,8 @@ int rcksum_submit_source_file(struct rcksum_state *z, FILE * f, int progress) {
         if (ferror(f)) {
             perror("fread");
             free(buf);
+            if (progress)
+                end_progress(p, 0);
             return got_blocks;
         }
         if (feof(f)) {          /* 0 pad to complete a block */
@@ -471,10 +523,13 @@ int rcksum_submit_source_file(struct rcksum_state *z, FILE * f, int progress) {
         /* Process the data in the buffer, and report progress */
         got_blocks += rcksum_submit_source_data(z, buf, len, start_in);
         if (progress && in_mb != in / 1000000) {
+            do_progress(p, 100.0 * in / size, in);
             in_mb = in / 1000000;
-            fputc('*', stderr);
         }
     }
     free(buf);
+    if (progress) {
+        end_progress(p, 2);
+    }
     return got_blocks;
 }

@@ -22,7 +22,6 @@
 #include <inttypes.h>
 #else
 #include <sys/types.h>
-
 #endif
 
 #define	MD4_BLOCK_LENGTH		64

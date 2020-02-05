@@ -29,7 +29,9 @@ struct rsum {
 
 #define CHECKSUM_SIZE 16
 
-struct rcksum_state* rcksum_init(zs_blockid nblocks, size_t blocksize, int rsum_butes, int checksum_bytes, int require_consecutive_matches, char* directory);
+struct rcksum_state *rcksum_init(zs_blockid nblocks, size_t blocksize,
+                                 int rsum_butes, unsigned int checksum_bytes,
+                                 int require_consecutive_matches);
 void rcksum_end(struct rcksum_state* z);
 
 /* These transfer out the filename and handle of the file backing the data retrieved.
@@ -46,7 +48,8 @@ int rcksum_submit_source_data(struct rcksum_state* z, unsigned char* data, size_
 int rcksum_submit_source_file(struct rcksum_state* z, FILE* f, int progress);
 
 /* This reads back in data which is already known. */
-int rcksum_read_known_data(struct rcksum_state* z, unsigned char* buf, off_t offset, size_t len);
+ssize_t rcksum_read_known_data(struct rcksum_state *z, unsigned char *buf,
+                               off_t offset, size_t len);
 
 /* rcksum_needed_block_ranges tells you what blocks, within the given range,
  * are still unknown. It returns a list of block ranges in r[]
@@ -56,6 +59,8 @@ zs_blockid* rcksum_needed_block_ranges(const struct rcksum_state* z, int* num, z
 int rcksum_blocks_todo(const struct rcksum_state*);
 
 /* For preparing rcksum control files - in both cases len is the block size. */
-struct rsum __attribute__((pure)) rcksum_calc_rsum_block(const unsigned char* data, size_t len);
+struct rsum __attribute__((pure))
+rcksum_calc_rsum_block(const unsigned char *data, size_t len);
+
 void rcksum_calc_checksum(unsigned char *c, const unsigned char* data, size_t len);
 

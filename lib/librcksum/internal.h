@@ -41,14 +41,15 @@ struct rcksum_state {
     size_t blocksize;           /* And how many bytes per block */
     int blockshift;             /* log2(blocksize) */
     unsigned short rsum_a_mask; /* The mask to apply to rsum values before looking up */
-    int checksum_bytes;         /* How many bytes of the MD4 checksum are available */
+    unsigned short rsum_bits;   /* # of bits of rsum data in the .zsync for each block */
+    unsigned short hash_func_shift; /* Config for the hash function */
+    unsigned int checksum_bytes; /* How many bytes of the MD4 checksum are available */
     int seq_matches;
-
     unsigned int context;       /* precalculated blocksize * seq_matches */
 
     /* These are used by the library. Note, not thread safe. */
-    const struct hash_entry *rover;
     int skip;                   /* skip forward on next submit_source_data */
+    const struct hash_entry *rover;
 
     /* Internal; hint to rcksum_submit_source_data that it should try matching
      * the following block of input data against the block ->next_match.
@@ -64,15 +65,16 @@ struct rcksum_state {
 
     /* And a 1-bit per rsum value table to allow fast negative lookups for hash
      * values that don't occur in the target file. */
-    unsigned int bithashmask;
     unsigned char *bithash;
+    unsigned int bithashmask;
 
     /* Current state and stats for data collected by algorithm */
     int numranges;
     zs_blockid *ranges;
     int gotblocks;
     struct {
-        int hashhit, weakhit, stronghit, checksummed;
+        long long hashhit;
+        int weakhit, stronghit, checksummed;
     } stats;
 
     /* Temp file for output */
@@ -102,7 +104,7 @@ static inline unsigned calc_rhash(const struct rcksum_state *const z,
     unsigned h = e[0].r.b;
 
     h ^= ((z->seq_matches > 1) ? e[1].r.b
-        : e[0].r.a & z->rsum_a_mask) << BITHASHBITS;
+        : e[0].r.a & z->rsum_a_mask) << z->hash_func_shift;
 
     return h;
 }

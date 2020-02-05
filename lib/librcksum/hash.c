@@ -55,32 +55,122 @@ void rcksum_add_target_block(struct rcksum_state *z, zs_blockid b,
     }
 }
 
+static void print_hashstats(const struct rcksum_state* z) {
+#ifdef DEBUG
+    int i;
+    {
+        int num_bits_set = 0;
+        for (i = 0; i < z->bithashmask + 1; i++) {
+            unsigned char c;
+            for (c = z->bithash[i]; c; c &= c - 1)
+                num_bits_set++;
+        }
+            
+        fprintf(stderr, "bithash %dKB, density %.1f%%\n",
+                (z->bithashmask+1)/(1000 * 8),
+                100.0 * num_bits_set / (z->bithashmask + 1));
+    }
+    {
+        int hash_entries_used = 0;
+        int max_depth = 0;
+        for (i = 0; i < z->hashmask + 1; i++) {
+            struct hash_entry* p = z->rsum_hash[i];
+            if (!p) continue;
+            hash_entries_used++;
+            int depth;
+            for (depth = 0; p; p = p->next)
+                depth++;
+            if (depth > max_depth) max_depth = depth;
+        }
+        fprintf(stderr,
+                "rsum hash density: %d/%d %.1f%% (depth avg: %.1f, max: %d)\n",
+                hash_entries_used, z->hashmask+1,
+                100.0 * hash_entries_used / (z->hashmask + 1),
+                z->blocks / (float)hash_entries_used, max_depth);
+    }
+#if 0
+    {   /* Print blocks on "0" hash-chain */
+        unsigned hash = 0;
+        const struct hash_entry *p = z->rsum_hash[hash & z->hashmask];
+        const struct hash_entry *first = p;
+        int depth = 0;
+        int in_range = 0;
+        while (p != NULL) {
+            zs_blockid id = get_HE_blockid(z, p);
+            if (memcmp(p->checksum, first->checksum, sizeof(p->checksum))) {
+                int next_is_too = 0;
+                if (p->next) {
+                    zs_blockid next_id = get_HE_blockid(z, p->next);
+                    if (next_id == id + 1)
+                        if (memcmp(p->next->checksum, first->checksum, sizeof(p->checksum)))
+                            next_is_too = 1;;
+                }
+                if (!in_range) {
+                    printf("%d", id);
+                    if (next_is_too) {
+                        fputs("-", stdout);
+                        in_range = 1;
+                    } else {
+                        fputs(",", stdout);
+                    }
+                } else {
+                    if (next_is_too) {
+                        printf("%d,", id);
+                        in_range = 0;
+                    }
+                }
+            }
+            p = p->next;
+            depth++;
+        }
+        printf(" (depth %d)\n", depth);
+    }
+#endif
+#endif
+}
+
 /* build_hash(self)
  * Build hash tables to quickly lookup a block based on its rsum value.
  * Returns non-zero if successful.
  */
 int build_hash(struct rcksum_state *z) {
     zs_blockid id;
-    int i = 16;
+    int avail_bits = z->seq_matches > 1 ? min(z->rsum_bits, 16)*2 : z->rsum_bits;
+    int hash_bits = avail_bits;
 
-    /* Try hash size of 2^i; step down the value of i until we find a good size
-     */
-    while ((2 << (i - 1)) > z->blocks && i > 4)
-        i--;
+    /* Pick a hash size that is a power of two and gives a load factor of <1 */
+    while ((1U << (hash_bits-1)) > z->blocks && hash_bits > 5)
+        hash_bits--;
 
     /* Allocate hash based on rsum */
-    z->hashmask = (2 << i) - 1;
+    z->hashmask = (1U << hash_bits) - 1;
     z->rsum_hash = calloc(z->hashmask + 1, sizeof *(z->rsum_hash));
     if (!z->rsum_hash)
         return 0;
 
-    /* Allocate bit-table based on rsum */
-    z->bithashmask = (2 << (i + BITHASHBITS)) - 1;
+    /* Allocate bit-table based on rsum. Aim is for 1/(1<<BITHASHBITS) load
+     * factor, so hash_vits shouls be hash_bits + BITHASHBITS if we have that
+     * many bits available. */
+    hash_bits = min(hash_bits + BITHASHBITS, avail_bits);
+    z->bithashmask = (1U << hash_bits) - 1;
     z->bithash = calloc(z->bithashmask + 1, 1);
     if (!z->bithash) {
         free(z->rsum_hash);
         z->rsum_hash = NULL;
         return 0;
+    }
+
+    /* We want the hash function to return hash_bits bits. We will xor one
+     * number with a second number that may have fewer than 16 bits of
+     * available data; set up an appropriate bit shift for the second number.
+     * This is closely tied to calc_rhash().
+     */
+    if (z->seq_matches > 1 && avail_bits < 24) {
+        /* second number has (avail_bits/2) bits available. */
+        z->hash_func_shift = max(0, hash_bits - (avail_bits / 2));
+    } else {
+        /* second number has avail_bits - 16 bits available. */
+        z->hash_func_shift = max(0, hash_bits - (avail_bits - 16));
     }
 
     /* Now fill in the hash tables.
@@ -101,13 +191,28 @@ int build_hash(struct rcksum_state *z) {
         /* And set relevant bit in the bithash to 1 */
         z->bithash[(h & z->bithashmask) >> 3] |= 1 << (h & 7);
     }
+
+    print_hashstats(z);
     return 1;
+}
+
+static void sprint_checksum(char* buf, const struct hash_entry* t) {
+        sprintf(buf, "%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x", 
+                t->checksum[0], t->checksum[1],
+                t->checksum[2], t->checksum[3],
+                t->checksum[4], t->checksum[5],
+                t->checksum[6], t->checksum[7],
+                t->checksum[8], t->checksum[9],
+                t->checksum[10], t->checksum[11],
+                t->checksum[12], t->checksum[13],
+                t->checksum[14], t->checksum[15]);
 }
 
 /* remove_block_from_hash(self, block_id)
  * Remove the given data block from the rsum hash table, so it won't be
  * returned in a hash lookup again (e.g. because we now have the data)
  */
+
 void remove_block_from_hash(struct rcksum_state *z, zs_blockid id) {
     struct hash_entry *t = &(z->blockhashes[id]);
 

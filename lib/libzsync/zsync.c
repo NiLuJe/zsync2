@@ -4,8 +4,8 @@
  *   Copyright (C) 2004,2005,2007,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying
- *   file COPYING for the full license terms), or, at your option, any later
+ *   it under the terms of the Artistic License v2 (see the accompanying 
+ *   file COPYING for the full license terms), or, at your option, any later 
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -27,7 +27,7 @@
  * of byte ranges at particular URLs to be retrieved by the HTTP code.
  *
  * It also handles:
- * - blocking edge cases (decompressed data not lining up with blocks for rcksum;
+ * - blocking edge cases (decompressed data not lining up with blocks for rcksum; 
  *   last block of the file only containing partial data)
  * - recompression of the compressed data at the end of the transfer;
  * - checksum verification of the entire output.
@@ -57,9 +57,9 @@
 
 /* Probably we really want a table of compression methods here. But I've only
  * implemented SHA1 so this is it for now. */
-const char ckmeth_sha1[] = { "SHA-1" };
+static const char ckmeth_sha1[] = { "SHA-1" };
 
-/* List of options strings for gzip(1) allowed in the .zsync. This is
+/* List of options strings for gzip(1) allowed in the .zsync. This is 
  * security against someone specifying arbitrary commands. */
 static const char* const gzip_safe_option[] = {
     "--best",
@@ -71,7 +71,8 @@ static const char* const gzip_safe_option[] = {
     "--rsync --no-name",
     "--rsync --best --no-name"
 };
-const int gzip_safe_options = sizeof(gzip_safe_option)/sizeof *gzip_safe_option;
+static const int gzip_safe_options =
+    sizeof(gzip_safe_option) / sizeof *gzip_safe_option;
 
 /****************************************************************************
  *
@@ -112,18 +113,12 @@ struct zsync_state {
     char *gzhead;               /* And this is the header of the gzip file (for the mtime) */
 
     time_t mtime;               /* MTime: from the .zsync, or -1 */
-
-    /* directory to create */
-    char *target_dir;
 };
-
-off_t zsync_filelen(struct zsync_state *zs) {
-    return zs->filelen;
-}
 
 static int zsync_read_blocksums(struct zsync_state *zs, FILE * f,
                                 int rsum_bytes, int checksum_bytes,
                                 int seq_matches);
+static int zsync_sha1(struct zsync_state *zs, int fh);
 static int zsync_recompress(struct zsync_state *zs);
 static time_t parse_822(const char* ts);
 
@@ -144,7 +139,7 @@ static char **append_ptrlist(int *n, char **p, char *a) {
 }
 
 /* Constructor */
-struct zsync_state* zsync_begin(FILE * f, int headersOnly, const char* target_dir) {
+struct zsync_state *zsync_begin(FILE * f) {
     /* Defaults for the checksum bytes and sequential matches properties of the
      * rcksum_state. These are the defaults from versions of zsync before these
      * were variable. */
@@ -215,12 +210,13 @@ struct zsync_state* zsync_begin(FILE * f, int headersOnly, const char* target_di
                 zs->zurl = (char **)append_ptrlist(&(zs->nzurl), zs->zurl, strdup(p));
             }
             else if (!strcmp(buf, "Blocksize")) {
-                zs->blocksize = atol(p);
+                long blocksize = atol(p);
                 if (zs->blocksize < 0 || (zs->blocksize & (zs->blocksize - 1))) {
                     fprintf(stderr, "nonsensical blocksize %ld\n", zs->blocksize);
                     free(zs);
                     return NULL;
                 }
+                zs->blocksize = (size_t)blocksize;
             }
             else if (!strcmp(buf, "Hash-Lengths")) {
                 if (sscanf
@@ -314,36 +310,27 @@ struct zsync_state* zsync_begin(FILE * f, int headersOnly, const char* target_di
         free(zs);
         return NULL;
     }
-
-    if (target_dir != NULL)
-        zs->target_dir = strdup(target_dir);
-    else
-        zs->target_dir = NULL;
-
-    if (headersOnly == 0 && zsync_read_blocksums(zs, f, rsum_bytes, checksum_bytes, seq_matches) != 0) {
+    if (zsync_read_blocksums(zs, f, rsum_bytes, checksum_bytes, seq_matches) != 0) {
         free(zs);
         return NULL;
     }
     return zs;
 }
 
-// forward declare zsync_cur_filename
-static char *zsync_cur_filename(struct zsync_state *zs);
-
 /* zsync_read_blocksums(self, FILE*, rsum_bytes, checksum_bytes, seq_matches)
  * Called during construction only, this creates the rcksum_state that stores
  * the per-block checksums of the target file and holds the local working copy
  * of the in-progress target. And it populates the per-block checksums from the
  * given file handle, which must be reading from the .zsync at the start of the
- * checksums.
+ * checksums. 
  * rsum_bytes, checksum_bytes, seq_matches are settings for the checksums,
  * passed through to the rcksum_state. */
 static int zsync_read_blocksums(struct zsync_state *zs, FILE * f,
-                                int rsum_bytes, int checksum_bytes,
+                                int rsum_bytes, unsigned int checksum_bytes,
                                 int seq_matches) {
     /* Make the rcksum_state first */
     if (!(zs->rs = rcksum_init(zs->blocks, zs->blocksize, rsum_bytes,
-                               checksum_bytes, seq_matches, zs->target_dir))) {
+                               checksum_bytes, seq_matches))) {
         return -1;
     }
 
@@ -373,7 +360,7 @@ static int zsync_read_blocksums(struct zsync_state *zs, FILE * f,
 }
 
 /* parse_822(buf[])
- * Parse an RFC822 date string. Returns a time_t, or -1 on failure.
+ * Parse an RFC822 date string. Returns a time_t, or -1 on failure. 
  * E.g. Tue, 25 Jul 2006 20:02:17 +0000
  */
 static time_t parse_822(const char* ts) {
@@ -395,7 +382,7 @@ int zsync_hint_decompress(const struct zsync_state *zs) {
 
 /* zsync_blocksize(self)
  * Returns the blocksize used by zsync on this target. */
-int zsync_blocksize(const struct zsync_state *zs) {
+static size_t zsync_blocksize(const struct zsync_state *zs) {
     return zs->blocksize;
 }
 
@@ -435,15 +422,13 @@ int zsync_status(const struct zsync_state *zs) {
  */
 void zsync_progress(const struct zsync_state *zs, long long *got,
                     long long *total) {
-    if (!zs->rs)
-        return;
 
     if (got) {
         int todo = zs->blocks - rcksum_blocks_todo(zs->rs);
-        *got = todo * zs->blocksize;
+        *got = todo * (long long)zs->blocksize;
     }
     if (total)
-        *total = zs->blocks * zs->blocksize;
+        *total = zs->blocks * (long long)zs->blocksize;
 }
 
 /* zsync_get_urls(self, &num, &type)
@@ -453,16 +438,16 @@ void zsync_progress(const struct zsync_state *zs, long long *got,
  * Note that these URLs could be for encoded versions of the target; a 'type'
  * is returned in *type which tells libzsync in later calls what version of the
  * target is being retrieved. */
-const char * const *zsync_get_urls(struct zsync_state *zs, int *n, int *t) {
+const char *const *zsync_get_urls(struct zsync_state *zs, int *n, int *t) {
     if (zs->zmap && zs->nzurl) {
         *n = zs->nzurl;
         *t = 1;
-        return (const char * const *) zs->zurl;
+        return zs->zurl;
     }
     else {
         *n = zs->nurl;
         *t = 0;
-        return (const char * const *) zs->url;
+        return zs->url;
     }
 }
 
@@ -531,7 +516,7 @@ int zsync_submit_source_file(struct zsync_state *zs, FILE * f, int progress) {
     return rcksum_submit_source_file(zs->rs, f, progress);
 }
 
-char *zsync_cur_filename(struct zsync_state *zs) {
+static char *zsync_cur_filename(struct zsync_state *zs) {
     if (!zs->cur_filename)
         zs->cur_filename = rcksum_filename(zs->rs);
 
@@ -614,7 +599,7 @@ int zsync_complete(struct zsync_state *zs) {
  * target, read it and compare the SHA1 checksum with the one from the .zsync.
  * Returns -1 or 1 as per zsync_complete.
  */
-int zsync_sha1(struct zsync_state *zs, int fh) {
+static int zsync_sha1(struct zsync_state *zs, int fh) {
     SHA1_CTX shactx;
 
     {                           /* Do SHA1 of file contents */
@@ -706,10 +691,10 @@ static int zsync_recompress(struct zsync_state *zs) {
             }
             while (!feof(g)) {
                 char buf[1024];
-                int r;
+                size_t r;
                 const char *p = buf;
 
-                if ((r = fread(buf, 1, sizeof(buf), g)) < 0) {
+                if ((r = fread(buf, 1, sizeof(buf), g)) == 0 && ferror(g)) {
                     perror("fread");
                     rc = -1;
                     goto leave_it;
@@ -718,7 +703,8 @@ static int zsync_recompress(struct zsync_state *zs) {
                     p = skip_zhead(buf);
                     skip = 0;
                 }
-                if (fwrite(p, 1, r - (p - buf), zout) != r - (p - buf)) {
+								int bytes_to_write = r - (p - buf);
+                if (fwrite(p, 1, bytes_to_write, zout) != bytes_to_write) {
                     perror("fwrite");
                     rc = -1;
                     goto leave_it;
@@ -770,10 +756,7 @@ char *zsync_end(struct zsync_state *zs) {
     free(zs->checksum);
     free(zs->filename);
     free(zs->zfilename);
-    if (zs->target_dir != NULL)
-        free(zs->target_dir);
     free(zs);
-    zs = NULL;
     return f;
 }
 
@@ -784,15 +767,16 @@ char *zsync_end(struct zsync_state *zs) {
  * Rewrites the state in the given zlib stream object to be ready to decompress
  * data from the compressed version of this zsync stream at the given offset in
  * the compressed file. Returns the offset in the uncompressed stream that this
- * corresponds to in the 4th parameter.
+ * corresponds to in the 4th parameter. 
  */
-void zsync_configure_zstream_for_zdata(const struct zsync_state *zs,
-                                       struct z_stream_s *zstrm,
-                                       long zoffset, off_t *poutoffset) {
+static void zsync_configure_zstream_for_zdata(const struct zsync_state *zs,
+                                              struct z_stream_s *zstrm,
+                                              long zoffset,
+                                              off_t *poutoffset) {
     configure_zstream_for_zdata(zs->zmap, zstrm, zoffset, poutoffset);
     {                           /* Load in prev 32k sliding window for backreferences */
         off_t pos = *poutoffset;
-        int lookback = (pos > 32768) ? 32768 : pos;
+        size_t lookback = (pos > 32768) ? 32768 : pos;
 
         /* Read in 32k of leading uncompressed context - needed because the deflate
          * compression method includes back-references to previously-seen strings. */
@@ -942,7 +926,7 @@ static int zsync_receive_data_compressed(struct zsync_receiver *zr,
         return 0;
 
     /* Now set up for the downloaded block */
-    zr->strm.next_in = (unsigned char *) buf;
+    zr->strm.next_in = buf;
     zr->strm.avail_in = len;
 
     if (zr->strm.total_in == 0 || offset != zr->strm.total_in) {
@@ -959,7 +943,7 @@ static int zsync_receive_data_compressed(struct zsync_receiver *zr,
                     "data didn't align with block boundary in compressed stream\n");
             return 1;
         }
-        zr->strm.next_in = (unsigned char *) buf;
+        zr->strm.next_in = buf;
         zr->strm.avail_in = len;
     }
 
@@ -1006,7 +990,7 @@ static int zsync_receive_data_compressed(struct zsync_receiver *zr,
 }
 
 /* zsync_receive_data(self, buf[], offset, buflen)
- * Passes data received from the source URL at the given offset;
+ * Passes data received from the source URL at the given offset; 
  * data is buflen bytes in buf[].
  * Returns 0 unless there's an error (e.g. the submitted data doesn't match the
  * expected checksum for the corresponding blocks)

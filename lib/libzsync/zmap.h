@@ -3,8 +3,8 @@
  *   Copyright (C) 2004,2005,2007,2009 Colin Phipps <cph@moria.org.uk>
  *
  *   This program is free software; you can redistribute it and/or modify
- *   it under the terms of the Artistic License v2 (see the accompanying
- *   file COPYING for the full license terms), or, at your option, any later
+ *   it under the terms of the Artistic License v2 (see the accompanying 
+ *   file COPYING for the full license terms), or, at your option, any later 
  *   version of the same license.
  *
  *   This program is distributed in the hope that it will be useful,
@@ -29,7 +29,7 @@ struct zmap* zmap_make(const struct gzblock* zb, int n);
 void zmap_free(struct zmap*);
 
 off_t* zmap_to_compressed_ranges(const struct zmap* zm, off_t* byterange, int nrange, int* num);
-void configure_zstream_for_zdata(const struct zmap* zm, struct z_stream_s* zs, long zoffset, off_t* poutoffset);
+void configure_zstream_for_zdata(const struct zmap* zm, struct z_stream_s* zs, long zoffset, long long* poutoffset);
 
 /* gzip flag byte */
 #define GZ_ASCII_FLAG   0x01 /* bit 0 set: file probably ascii text */
