@@ -33,6 +33,7 @@
  * - checksum verification of the entire output.
  */
 #include "zsglobal.h"
+#include "config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -125,7 +126,7 @@ off_t zsync_filelen(struct zsync_state *zs) {
 static int zsync_read_blocksums(struct zsync_state *zs, FILE * f,
                                 int rsum_bytes, unsigned int checksum_bytes,
                                 int seq_matches);
-static int zsync_sha1(struct zsync_state *zs, int fh);
+//static int zsync_sha1(struct zsync_state *zs, int fh);
 static int zsync_recompress(struct zsync_state *zs);
 static time_t parse_822(const char* ts);
 
@@ -617,7 +618,7 @@ int zsync_complete(struct zsync_state *zs) {
  * target, read it and compare the SHA1 checksum with the one from the .zsync.
  * Returns -1 or 1 as per zsync_complete.
  */
-static int zsync_sha1(struct zsync_state *zs, int fh) {
+int zsync_sha1(struct zsync_state *zs, int fh) {
     SHA1_CTX shactx;
 
     {                           /* Do SHA1 of file contents */
@@ -721,7 +722,7 @@ static int zsync_recompress(struct zsync_state *zs) {
                     p = skip_zhead(buf);
                     skip = 0;
                 }
-								int bytes_to_write = r - (p - buf);
+                int bytes_to_write = r - (p - buf);
                 if (fwrite(p, 1, bytes_to_write, zout) != bytes_to_write) {
                     perror("fwrite");
                     rc = -1;

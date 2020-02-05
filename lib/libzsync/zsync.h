@@ -98,7 +98,7 @@ int zsync_receive_data(struct zsync_receiver* zr, const unsigned char* buf, off_
  * target, read it and compare the SHA1 checksum with the one from the .zsync.
  * Returns -1 or 1 as per zsync_complete.
  */
-//static int zsync_sha1(struct zsync_state *zs, int fh);
+int zsync_sha1(struct zsync_state *zs, int fh);
 
 /* zsync_filelen(self)
  * Returns remote file length
