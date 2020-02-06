@@ -39,6 +39,7 @@ typedef enum {
         CODELENS,   /* i: waiting for length/lit and distance code lengths */
             LEN_,       /* i: same as LEN below, but only first time in */
             LEN,        /* i: waiting for length/lit/eob code */
+            LENDO,      /* i: same, but skip exit check */
             LENEXT,     /* i: waiting for length extra bits */
             DIST,       /* i: waiting for distance code */
             DISTEXT,    /* i: waiting for distance extra bits */
