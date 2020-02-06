@@ -808,7 +808,7 @@ static void zsync_configure_zstream_for_zdata(const struct zsync_state *zs,
         /* Fake an output buffer of 32k filled with data to zlib */
         zstrm->next_out = wbuf + lookback;
         zstrm->avail_out = 0;
-        updatewindow(zstrm, lookback);
+        updatewindow(zstrm, zstrm->next_out, lookback - zstrm->avail_out);
     }
 }
 

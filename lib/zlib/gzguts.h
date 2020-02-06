@@ -130,7 +130,7 @@
 #else
 #  ifndef NO_STRERROR
 #    include <errno.h>
-#    define zstrerror() strerror(errno)
+#    define zstrerror(e) strerror(e)
 #  else
 #    define zstrerror() "stdio error (consult errno)"
 #  endif

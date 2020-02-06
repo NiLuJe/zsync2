@@ -11,6 +11,20 @@
 
 #include "zutil.h"
 
+// Pulled out from gzguts.h
+/* get errno and strerror definition */
+#if defined UNDER_CE
+#  include <windows.h>
+#  define zstrerror() gz_strwinerror((DWORD)GetLastError())
+#else
+#  ifndef NO_STRERROR
+#    include <errno.h>
+#    define zstrerror(e) strerror(e)
+#  else
+#    define zstrerror() "stdio error (consult errno)"
+#  endif
+#endif
+
 #ifdef NO_DEFLATE       /* for compatiblity with old definition */
 #  define NO_GZCOMPRESS
 #endif
@@ -496,6 +510,12 @@ int ZEXPORT gzread (file, buf, len)
       Reads one byte from the compressed file. gzgetc returns this byte
    or -1 in case of end of file or error.
 */
+/* -- see zlib.h -- */
+#ifdef Z_PREFIX_SET
+#  undef z_gzgetc
+#else
+#  undef gzgetc
+#endif
 int ZEXPORT gzgetc(file)
     gzFile file;
 {

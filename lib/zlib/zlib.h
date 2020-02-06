@@ -1757,7 +1757,8 @@ ZEXTERN uLong ZEXPORT crc32_combine OF((uLong crc1, uLong crc2, z_off_t len2));
    len2.
 */
 
-ZEXTERN int ZEXPORT updatewindow OF((z_streamp strm, unsigned out));
+ZEXTERN int ZEXPORT updatewindow OF((z_streamp strm, const unsigned char FAR *end,
+                                     unsigned copy));
 ZEXTERN void ZEXPORT inflate_advance OF((z_streamp strm, int zoffset, int b, int s));
 
                         /* various hacks, don't look :) */
