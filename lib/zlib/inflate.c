@@ -1048,11 +1048,12 @@ int flush;
             state->mode = LEN_;
             if (flush == Z_TREES) goto inf_leave;
         case LEN_:
+            state->mode = LEN;
+        case LEN:
             state->mode = LENDO;
             goto inf_leave;
         case LENDO:
         /* cph - remove inflate_fast */
-        case LEN:
             /*
             if (have >= 6 && left >= 258) {
                 RESTORE();
@@ -1612,7 +1613,7 @@ z_streamp strm;
 {
     struct inflate_state FAR *state;
 
-    if (strm == Z_NULL || strm->state == Z_NULL) return Z_STREAM_ERROR;
+    if (inflateStateCheck(strm)) return Z_STREAM_ERROR;
     state = (struct inflate_state FAR *)strm->state;
     return (state->mode == LENDO || state->mode == COPY);
 }
